@@ -196,7 +196,7 @@ const App = () => {
           WELCOME!
         </div>
         <div className="bio">
-          イーサリアムウォレットを接続して、メッセージを作成したら、
+          イーサリアムウォレット(Rinkbyネットワーク)を接続して、メッセージを作成したら、
           <span role="img" aria-label="hand-wave">
             👋
           </span>

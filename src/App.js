@@ -15,6 +15,91 @@ const App = () => {
   // APIの内容を参照する変数を作成
   const contractABI = abi.abi;
 
+  /* すべてのwavesを保存する状態変数を定義 */
+  const [allWaves, setAllWaves] = useState([]);
+
+  const getAllWaves = async () => {
+    const { ethereum } = window;
+
+    try {
+      if (ethereum) {
+        // プロバイダー(Metamask)の取得 → イーサリアムノードへ接続
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        // ユーザーのウォレットアドレス(signer)を取得
+        const signer = provider.getSigner();
+        // コントラクトのデプロイ先のアドレス ＆ ABI & providor or signer の3つをethers.Contract関数にわたす
+        // 今回はsignerを引数としているのでwavePortalContractインスタンスは読み書き両方できる
+        const wavePortalContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        );
+        /* コントラクトからgetAllWavesメソッドを呼び出す */
+        const waves = await wavePortalContract.getAllWaves();
+        /* UIに必要なのは、アドレス、タイムスタンプ、メッセージだけなので、以下のように設定 */
+        // mapメソッドを利用してwaves配列をループし、配列内の各要素を返している
+        const wavesCleaned = waves.map((wave) => {
+          return {
+            address: wave.waver,
+            timestamp: new Date(wave.timestamp * 1000),
+            message: wave.message,
+          };
+        });
+
+        /* React Stateにデータを格納する */
+        setAllWaves(wavesCleaned);
+      } else {
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  /**
+  * `emit`されたイベントに反応する
+  */
+  useEffect(() => {
+    let wavePortalContract;
+
+    // 1.コントラクト側で新しくNewWaveイベントがemitさらたとき情報を取得する
+    // 2. フロント側からアクセスできるようにする
+    // onNewWave関数はNewWaveのイベントリスナの働きをしている
+    // フロントエンドでユーザーがwaveを送ったという動作を受け取っている
+    const onNewWave = (from, timestamp, message) => {
+      console.log("NewWave", from, timestamp, message);
+      setAllWaves((prevState) => [
+        ...prevState,
+        {
+          address: from,
+          timestamp: new Date(timestamp * 1000),
+          message: message,
+        },
+      ]);
+    };
+
+    /* NewWaveイベントがコントラクトから発信されたときに、情報を受け取ります */
+    if (window.ethereum) {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+
+      wavePortalContract = new ethers.Contract(
+        contractAddress,
+        contractABI,
+        signer
+      );
+      // フロントエンドはNewWaveイベントがコントラクトから発信されたときに、情報を受取る
+      // コンポーネント(情報)がマウント(フロントエンドに反映)される
+      wavePortalContract.on("NewWave", onNewWave);
+    }
+    /*メモリリークを防ぐために、NewWaveのイベントを解除します*/
+    return () => {
+      if (wavePortalContract) {
+        wavePortalContract.off("NewWave", onNewWave);
+      }
+    };
+  }, []);
+
   /* window.ethereumにアクセスできることを確認します */
   const checkIfWalletIsConnected = async () => {
     try {
